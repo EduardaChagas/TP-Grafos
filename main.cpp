@@ -1,20 +1,27 @@
 #include <bits/stdc++.h>
 #define pb push_back
-#define MAX 1000001
+#define MAX 10000000001
 using namespace std;
 
 typedef vector<int> vi;
-typedef vector<vi> vvi;
 typedef pair<int,int> ii;
 typedef vector<ii> vii;
+typedef vector<vii> vvii;
 typedef long long int lli;
 
 struct node{
-    int id;
-    int id_ship;
-    int distance;
+    lli id;
+    lli id_ship;
+    lli distance;
     vi AdjNodes;
     string color = "";
+};
+
+struct typeShips{
+    lli recognition = 0;
+    lli frigates = 0;
+    lli bombings = 0;
+    lli conveyors = 0;
 };
 
 typedef vector<node> graph;
@@ -22,7 +29,8 @@ typedef vector<graph> group_graphs;
 graph spaceship;
 graph ship_find;
 group_graphs ships_found;
-vvi distances_stations;
+vi ships_found_type; //1 = Reconhecimento; 2 = Frigata; 3 = Bombardeio; 4 = Transportadores
+typeShips countShips;
 
 void print_graph(graph g){
     printf("Começo \n");
@@ -44,95 +52,72 @@ void print_group_graph(group_graphs g){
 
 //###################################################################################################
 
-int BFS(graph g, int init, int end){
+lli BFS(graph g, int init, int end){
+
     for(int i = 0; i < g.size(); i++)
     {
-        g[i].color.assign("WHITE");
-        //g[i].distance = 0;
+        spaceship[g[i].id - 1].color.assign("WHITE");
+        spaceship[g[i].id - 1].distance = 0;
     }
 
     node u;
-    queue<node> q; q.push(g[init]);
+    queue<node> q; q.push(spaceship[init]);
 
     while(!q.empty())
     {
         u = q.front(); q.pop();
-
         for(int i=0; i < u.AdjNodes.size(); i++)
         {
-            if((g[u.AdjNodes[i]].color == "WHITE") && (u.AdjNodes[i] != end))
+            if((spaceship[u.AdjNodes[i]].color == "WHITE") && (u.AdjNodes[i] != end))
             {
-                g[u.AdjNodes[i]].color = "GREY";
-                if(distances_stations[init][u.AdjNodes[i]] == MAX) {
-                    distances_stations[init][u.AdjNodes[i]] = distances_stations[init][u.id - 1] + 1;
-                    distances_stations[u.AdjNodes[i]][init] = distances_stations[u.id - 1][init] + 1;
-                }
-                //cout << "OI " << u.AdjNodes[i] << " Distance: " << distances_stations[init][u.AdjNodes[i]] << endl;
-                //g[u.AdjNodes[i]].distance = u.distance + 1;
-                q.push(g[u.AdjNodes[i]]);
+                spaceship[u.AdjNodes[i]].color = "GREY";
+                spaceship[u.AdjNodes[i]].distance = u.distance + 1;
+                q.push(spaceship[u.AdjNodes[i]]);
             }else if(u.AdjNodes[i] == end){
-                distances_stations[init][end] = distances_stations[init][u.id - 1] + 1;
-                distances_stations[end][init] = distances_stations[u.id - 1][init] + 1;
-                return 0;
-                //cout << "OI CHEGUEI " << g[u.AdjNodes[i]].id << " - Distance of my ancestor: " << u.distance << endl;
-                //g[u.AdjNodes[i]].distance = u.distance + 1;
-                //return g[u.AdjNodes[i]].distance;
+                spaceship[u.AdjNodes[i]].distance = u.distance + 1;
+                return spaceship[u.AdjNodes[i]].distance;
             }
         }
         u.color = "BLACK";
-
     }
     return 0;
 }
 
-int minor_distance(vi distances, int N)
+void find_distance(vvii teleport)
 {
-    int minor = distances[0];
-    for(int i = 1; i < N;i++)
-    {
-        if(distances[i] < minor) minor = distances[i];
-    }
-    return minor;
-}
+    lli distance, minor_distance = MAX;
 
-void find_distance(int N, vii teleport)
-{
-    int ship_index, minor, distance;
-    vi distances_ship(ships_found.size());
-    vvi d(spaceship.size(),vi(spaceship.size()));
-    distances_stations = d;
-
-    for(int i = 0; i < spaceship.size(); i++)
+    for(int i = 0; i < teleport.size(); i++) //Rodando o tempo de vantagem pra cada nave
     {
-        for(int j = 0; j < spaceship.size(); j++)
+        distance = 0;
+        for(int j = 0; j < teleport[i].size(); j++) //Calculando o tempo de vantagem para uma dada nave específica
         {
-            if(i != j) distances_stations[i][j] = MAX;
-            else distances_stations[i][j] = 0;
+            if(distance <= minor_distance)
+            {
+                if(teleport[i][j].first - teleport[i][j].second != 0)
+                {
+                    if (ships_found_type[i] == 1) //Tempo de vantagem para as naves de reconhecimento
+                        distance += abs(teleport[i][j].first - teleport[i][j].second);
+                    else if (ships_found_type[i] == 4) //Tempo de vantagem para as naves transportadoras
+                    {
+                        if (abs(teleport[i][j].first - teleport[i][j].second) <
+                            abs(teleport[i][j].second - teleport[i][j].first))
+                            distance += abs(teleport[i][j].first - teleport[i][j].second);
+                        else
+                            distance += abs(teleport[i][j].second - teleport[i][j].first);
+                    }else
+                        distance += BFS(ships_found[i], teleport[i][j].first, teleport[i][j].second);
+                }
+            }
         }
+        if(distance < minor_distance)  minor_distance = distance;
     }
-    for(int i = 0; i < ships_found.size(); i++)
-    {
-        distances_ship[i] = 0;
-    }
-
-    for(int i = 0; i < N; i++)
-    {
-        ship_index = spaceship[teleport[i].first].id_ship;
-        if(distances_stations[teleport[i].first][teleport[i].second] == MAX)
-        {
-            BFS(spaceship, teleport[i].first, teleport[i].second);
-            distances_ship[ship_index] += distances_stations[teleport[i].first][teleport[i].second];
-        }else distances_ship[ship_index] += distances_stations[teleport[i].first][teleport[i].second];
-        //cout <<"INIT: " << teleport[i].first + 1 << " END: " << teleport[i].second + 1 << " DISTANCE: " <<  distances_ship[ship_index] << endl;
-        //printf("\n");
-    }
-    minor = minor_distance(distances_ship, ships_found.size());
-    cout << minor/2 << endl;
+    cout << minor_distance/2 << endl;
 }
 
 //###################################################################################################
 
-void DFS_Visit(int vertex, int number_ship)
+void DFS_Visit(lli vertex, lli number_ship)
 {
     spaceship[vertex].color = "GREY";
     for(int i = 0; i < spaceship[vertex].AdjNodes.size(); i++)
@@ -150,7 +135,7 @@ void DFS_Visit(int vertex, int number_ship)
 //Modificação do DFS para encontrar componentes conexas utilizando variável adicional
 int DFS_NumberOfSpaceships(int n_vertex)
 {
-    int var_number_ship = 0;
+    lli var_number_ship = 0;
     for(int i = 0; i < n_vertex; i++) //Inicializando os vértices
     {
         spaceship[i].color.assign("WHITE");
@@ -177,7 +162,8 @@ bool is_not_recognition(graph g){
     int i = 0;
     int one_adj = 2;
 
-    while((i < g.size()) && (g[i].AdjNodes.size() <= 2) && (one_adj >= 0)){
+    while((i < g.size()) && (g[i].AdjNodes.size() <= 2) && (one_adj >= 0))
+    {
         i++;
         if(g[i].AdjNodes.size() == 1) one_adj--;
     }
@@ -198,32 +184,48 @@ int number_edge(graph g){
     return n;
 }
 
-void identification_ships(group_graphs gg){
-    int recognition = 0, frigates = 0, bombings = 0, conveyors = 0, n_edge;
-    for(int i = 0; i < gg.size(); i++){
-        n_edge = number_edge(gg[i]);
-        if(gg[i].size() == n_edge) conveyors++; //Transportadora -> N.Arestas = N.Vértices
-        else if(n_edge == (gg[i].size() - 1)){
-            if(is_not_recognition(gg[i])) frigates++;
-            else recognition++;
-        }else bombings++;
+void identification_ships(){
+    int n_edge;
+    for(int i = 0; i < ships_found.size(); i++)
+    {
+        n_edge = number_edge(ships_found[i]);
+        if(ships_found[i].size() == n_edge)
+        {
+            countShips.conveyors++; //Transportadora -> N.Arestas = N.Vértices
+            ships_found_type.pb(4);
+        }
+        else if(n_edge == (ships_found[i].size() - 1))
+        {
+            if(is_not_recognition(ships_found[i]))
+            {
+                countShips.frigates++;
+                ships_found_type.pb(2);
+            }
+            else
+            {
+                countShips.recognition++;
+                ships_found_type.pb(1);
+            }
+        }else
+        {
+            countShips.bombings++;
+            ships_found_type.pb(3);
+        }
     }
-    cout << recognition << " " << frigates  << " " << bombings  << " " << conveyors << endl;
+    cout << countShips.recognition << " " << countShips.frigates  << " " << countShips.bombings  << " " << countShips.conveyors << endl;
 }
 
 //###################################################################################################
 
 int main()
 {
-    auto start = chrono::high_resolution_clock::now(); //Início do cálculo do tempo de processamento do programa
+    //auto start = chrono::high_resolution_clock::now(); //Início do cálculo do tempo de processamento do programa
     int N, M;
     int from, arrival;
-    vii teleport;
 
     //Leitura dos tamanhos da entrada
     cin >> N >> M;
     spaceship.resize(N);
-    teleport.resize(N);
 
     //Armazenando o grafo de entrada
     for(int i = 0; i < M; i++)
@@ -232,21 +234,25 @@ int main()
         spaceship[from-1].AdjNodes.pb(arrival-1);
         spaceship[arrival-1].AdjNodes.pb(from-1);
     }
+    DFS_NumberOfSpaceships(N); //Aplicando o DFS para identificar o número de naves da tropa inimiga
+    identification_ships(); //Detectando cada tipo de nave inimiga
+
+    vvii teleport(ships_found.size());
+    ii aux;
+
     //Lendo os teleportes
     for(int i = 0; i < N; i++)
     {
         cin >> from >> arrival;
-        teleport[i].first = from - 1;
-        teleport[i].second = arrival - 1;
+        aux.first = from - 1;
+        aux.second = arrival - 1;
+        teleport[spaceship[from - 1].id_ship].pb(aux);
     }
+    find_distance(teleport); //Calculando o tempo de vantagem
 
-    DFS_NumberOfSpaceships(N); //Aplicando o DFS para identificar o número de naves da tropa inimiga
-    identification_ships(ships_found); //Detectando cada tipo de nave inimiga
-    find_distance(N, teleport); //Calculando o tempo de vantagem
-
-    auto finish = chrono::high_resolution_clock::now();
-    chrono::duration<double> elapsed = finish - start;
-    cout << "Elapsed time: " << elapsed.count() << " seconds\n";
+    //auto finish = chrono::high_resolution_clock::now();
+    //chrono::duration<double> elapsed = finish - start;
+    //cout << "Elapsed time: " << elapsed.count() << " seconds\n";
 
     return 0;
 }
